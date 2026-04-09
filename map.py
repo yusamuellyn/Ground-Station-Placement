@@ -6,39 +6,30 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point
 
-# -----------------------------
-# FILES
-# -----------------------------
+# files 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 csv_path   = os.path.join(script_dir, "cloud_fraction_2025_annual_avg (1).csv")
 world_shp  = os.path.join(script_dir, "ne_110m_admin_0_countries.shp")
 gdp_csv    = os.path.join(script_dir, "gdp.csv")
 
-# -----------------------------
-# TUNABLE PARAMETERS
-# -----------------------------
+
+# changeable paramters 
 CCF_THRESHOLD = 0.75   # max acceptable cloud fraction
 GRID_STEP     = 2.0    # degrees
 MAX_STATIONS  = 100    # total stations to place
 MIN_DIST_DEG  = 15.0   # starting min degrees between stations (relaxed automatically)
 ALPHA         = 0.75    # 0.0 = pure cloud score, 1.0 = pure GDP score
 
-# -----------------------------
-# LOAD CLOUD DATA
-# -----------------------------
+# load cloud data
 cloud_df         = pd.read_csv(csv_path, index_col=0)
 cloud_df.index   = pd.to_numeric(cloud_df.index)
 cloud_df.columns = pd.to_numeric(cloud_df.columns)
 
-# -----------------------------
-# LOAD WORLD MAP
-# -----------------------------
+# load world map
 world = gpd.read_file(world_shp)
 world = world[world["CONTINENT"] != "Antarctica"]
 
-# -----------------------------
-# LOAD & MERGE GDP
-# -----------------------------
+# load & merge GDP
 gdp_raw = pd.read_csv(gdp_csv, skiprows=4, engine="python", on_bad_lines="skip")
 gdp_raw = gdp_raw.loc[:, ~gdp_raw.columns.str.contains('^Unnamed')]
 
@@ -89,9 +80,8 @@ print(f"GDP matched: {matched} countries")
 if unmatched:
     print(f"Unmatched (using floor GDP): {unmatched[:15]}{'...' if len(unmatched) > 15 else ''}")
 
-# -----------------------------
-# BUILD LAND MASK & GDP LOOKUP
-# -----------------------------
+
+# Build Land MASK & GDP Lookup
 world_gdp = world_gdp.reset_index(drop=True)
 sindex = world_gdp.sindex
 
@@ -113,9 +103,7 @@ def get_gdp_weight(lat, lon):
             return float(row["gdp_weight"])
     return 0.0
 
-# -----------------------------
-# CLOUD COVERAGE FUNCTIONS
-# -----------------------------
+# cloud coverage functions
 def get_cloud_coverage(lat, lon):
     lat_idx = int(np.abs(cloud_df.index.values   - lat).argmin())
     lon_idx = int(np.abs(cloud_df.columns.values - lon).argmin())
@@ -159,9 +147,8 @@ def consider_cloud_coverage(lat, lon) -> tuple[float, float, bool]:
 
     return lat, lon, False
 
-# -----------------------------
-# GENERATE CANDIDATE STATIONS (land only)
-# -----------------------------
+
+# generate candidate ground stations on land
 print("Scanning grid for valid stations...")
 accepted, rejected = [], []
 
@@ -183,9 +170,8 @@ for lat in np.arange(-60, 80, GRID_STEP):
 accepted_df = pd.DataFrame(accepted)
 rejected_df = pd.DataFrame(rejected)
 
-# -----------------------------
-# COMBINED SCORE (cloud + GDP)
-# -----------------------------
+
+# combine score cloud = gdp
 accepted_df["cloud_norm"] = (
     1 - (accepted_df["ccf"] - accepted_df["ccf"].min()) /
     (accepted_df["ccf"].max() - accepted_df["ccf"].min() + 1e-9)
@@ -201,9 +187,7 @@ accepted_df["combined_score"] = (
     (1 - ALPHA) * accepted_df["cloud_norm"]
 )
 
-# -----------------------------
-# SPREAD STATIONS GEOGRAPHICALLY
-# -----------------------------
+# spread ground stations geographically
 def spread_stations(df, max_stations, min_dist):
     df = df.sort_values("combined_score", ascending=False).reset_index(drop=True)
     selected = []
@@ -236,9 +220,8 @@ out_csv = os.path.join(script_dir, "optimal_ground_stations.csv")
 accepted_df.to_csv(out_csv, index=False)
 print(f"Stations saved to {out_csv}")
 
-# -----------------------------
-# PLOT
-# -----------------------------
+
+# plot
 fig, ax = plt.subplots(figsize=(18, 9))
 
 # Cloud fraction heatmap background
