@@ -5,7 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point
-
+# FOr every GDP location, you'll have one ground station
 # -----------------------------
 # FILES
 # -----------------------------
@@ -17,11 +17,11 @@ gdp_csv    = os.path.join(script_dir, "gdp.csv")
 # -----------------------------
 # TUNABLE PARAMETERS
 # -----------------------------
-CCF_THRESHOLD = 0.75   # max acceptable cloud fraction
+CCF_THRESHOLD = 0.60   # max acceptable cloud fraction
 GRID_STEP     = 2.0    # degrees
 MAX_STATIONS  = 100    # total stations to place
 MIN_DIST_DEG  = 15.0   # starting min degrees between stations (relaxed automatically)
-ALPHA         = 0.75    # 0.0 = pure cloud score, 1.0 = pure GDP score
+ALPHA         = 0.0    # 0.0 = pure cloud score, 1.0 = pure GDP score
 
 # -----------------------------
 # LOAD CLOUD DATA
@@ -141,20 +141,37 @@ def consider_cloud_coverage(lat, lon) -> tuple[float, float, bool]:
         (lat - lat_diff, lon - lon_diff),
     ]
 
-    best_ccf = ccf
-    best_lat = lat
-    best_lon = lon
+    def score_point(lat_, lon_):
+        c = get_cloud_coverage(lat_, lon_)
+        if c is None:
+            return None
+
+        g = get_gdp_weight(lat_, lon_)
+
+        cloud_score = 1 - c  # higher = better
+        gdp_score = g        # already normalized
+
+        return ALPHA * gdp_score + (1 - ALPHA) * cloud_score
+
+    best_score = score_point(lat, lon)
+    if best_score is None:
+        return lat, lon, False
+
+    best_lat, best_lon = lat, lon
 
     for new_lat, new_lon in neighbors:
-        neighbor_ccf = get_cloud_coverage(new_lat, new_lon)
-        if neighbor_ccf is None:
+        s = score_point(new_lat, new_lon)
+        if s is None:
             continue
-        if neighbor_ccf < best_ccf:
-            best_ccf = neighbor_ccf
+
+        if s > best_score:
+            best_score = s
             best_lat = new_lat
             best_lon = new_lon
 
-    if best_ccf <= CCF_THRESHOLD:
+    # enforce cloud constraint at final position
+    final_ccf = get_cloud_coverage(best_lat, best_lon)
+    if final_ccf is not None and final_ccf <= CCF_THRESHOLD:
         return best_lat, best_lon, True
 
     return lat, lon, False
