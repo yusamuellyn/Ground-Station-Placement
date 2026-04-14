@@ -1,0 +1,4 @@
+pandas>=2.0
+plotly>=5.0
+geopandas>=0.14
+shapely>=2.0
