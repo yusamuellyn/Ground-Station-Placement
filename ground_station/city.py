@@ -8,7 +8,7 @@ Requires:
 """
 
 from __future__ import annotations
-
+from cloud_coverage_check import get_na, consider_availability, consider_availability_greedy, MIN_AVAILABILITY
 import webbrowser
 from pathlib import Path
 
@@ -25,7 +25,7 @@ GAZ_PATH = "2024_Gaz_counties_national.txt"
 LAND_SHAPEFILE = "cb_2024_us_state_20m.shp"
 
 YEAR_COL = "2024"
-TOP_N = 30
+TOP_N = 100
 
 OUT_STATIONS = "ground_stations_top10_gdp.csv"
 OUT_MAP = "ground_stations_top10_gdp_map.html"
@@ -154,7 +154,29 @@ def main() -> None:
 
     # Save CSV
     top.to_csv(OUT_STATIONS, index=False)
+    
+    results = []
 
+    for _, row in top.iterrows():
+        lat = row["latitude"]
+        lon = row["longitude"]
+
+        ogs1, ogs2, availability, valid = consider_availability_greedy(lat, lon)
+
+        results.append({
+            "station_id": row["station_id"],
+            "ogs1_lon": ogs1[0],
+            "ogs1_lat": ogs1[1],
+            "ogs2_lon": ogs2[0],
+            "ogs2_lat": ogs2[1],
+            "availability": availability,
+            "meets_threshold": valid,
+        })
+
+    availability_df = pd.DataFrame(results)
+    OUT_AVAILABILITY = "ground_station_availability.csv"
+    availability_df.to_csv(OUT_AVAILABILITY, index=False)
+    
     # Bar chart
     bar = px.bar(
         top,
