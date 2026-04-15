@@ -127,7 +127,7 @@ def consider_availability(lat, lon) -> tuple[tuple[float, float], tuple[float, f
     ]
 
     opt_a = 0.0
-    lowest_na = ogs_na;
+    lowest_na = ogs_na
 
     ogs1_lat = lat
     ogs1_lon = lon
