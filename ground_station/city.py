@@ -73,10 +73,6 @@ def load_counties_gdp_geo() -> pd.DataFrame:
 
     return df
 
-
-# -----------------------------
-# LAND SNAPPING
-# -----------------------------
 def snap_points_to_land(df: pd.DataFrame, shapefile_path: str) -> pd.DataFrame:
     land = gpd.read_file(shapefile_path).to_crs("EPSG:4326")
     land_union = land.geometry.union_all()
@@ -100,10 +96,6 @@ def snap_points_to_land(df: pd.DataFrame, shapefile_path: str) -> pd.DataFrame:
 
     return pd.DataFrame(gdf.drop(columns="geometry"))
 
-
-# -----------------------------
-# MAIN
-# -----------------------------
 def main():
     df = load_counties_gdp_geo()
 
@@ -117,10 +109,7 @@ def main():
     top = snap_points_to_land(top, LAND_SHAPEFILE)
 
     top.to_csv(OUT_STATIONS, index=False)
-
-    # -----------------------------
-    # AVAILABILITY OPTIMIZATION
-    # -----------------------------
+    
     results = []
 
     for _, row in top.iterrows():
@@ -139,10 +128,6 @@ def main():
         })
 
     availability_df = pd.DataFrame(results)
-
-    # -----------------------------
-    # BUILD OGS DATASET
-    # -----------------------------
     ogs_points = []
 
     for _, row in availability_df.iterrows():
@@ -162,9 +147,7 @@ def main():
     ogs_df = pd.DataFrame(ogs_points)
     ogs_df.to_csv(OUT_OGS, index=False)
 
-    # -----------------------------
-    # ORIGINAL MAP
-    # -----------------------------
+    # orginal map
     map_fig = px.scatter_geo(
         top,
         lat="latitude",
@@ -174,9 +157,8 @@ def main():
     )
     map_fig.write_html(OUT_MAP, include_plotlyjs=True)
 
-    # -----------------------------
-    # OGS MAP
-    # -----------------------------
+
+    # ogs map
     ogs_map = px.scatter_geo(
         ogs_df,
         lat="latitude",
@@ -186,16 +168,15 @@ def main():
         title="Optimized Ground Stations",
     )
     ogs_map.write_html(OUT_OGS_MAP, include_plotlyjs=True)
+    
+#  combined map 
 
-    # -----------------------------
-# ✅ COMBINED MAP (IMPROVED SIZING)
-# -----------------------------
     top_map = top.copy()
     top_map["type"] = "Original"
-    top_map["size"] = 9   # BIGGER
+    top_map["size"] = 9 
 
     ogs_plot = ogs_df.copy()
-    ogs_plot["size"] = 4   # smaller
+    ogs_plot["size"] = 4   
 
     combined = pd.concat([
         top_map[["station_id", "latitude", "longitude", "type", "size"]],
@@ -208,13 +189,12 @@ def main():
         lon="longitude",
         scope="usa",
         color="type",
-        size="size",              # 👈 key line
-        size_max=9,              # controls scaling
+        size="size",              
+        size_max=9,              
         hover_data={"station_id": True},
         title="Original vs Optimized Ground Stations",
     )
 
-# Optional: cleaner look (prevents weird scaling artifacts)
     combined_map.update_traces(marker=dict(opacity=0.85, line=dict(width=1)))
 
     combined_map.write_html(OUT_COMBINED_MAP, include_plotlyjs=True)
